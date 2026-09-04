@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react";
 import { StudentSelector, StudentIdentity } from "@/components/chat/student-selector";
 import { ChatMessage } from "@/components/chat/message";
 import { useLiveResource } from "@/hooks/useLiveResource";
@@ -11,12 +10,23 @@ import {
   RefreshCw,
   Trash2,
   Radio,
-  Clock,
-  Calendar,
-  Building,
-  Bell,
-  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+
+export interface ToolInvocation {
+  state: "partial-call" | "call" | "result";
+  toolCallId: string;
+  toolName: string;
+  args: any;
+  result?: any;
+}
+
+export interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  toolInvocations?: ToolInvocation[];
+}
 
 const SUGGESTED_PROMPTS = [
   "What classes do I have on Wednesday?",
@@ -27,6 +37,11 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export default function ChatPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [currentStudent, setCurrentStudent] = useState<StudentIdentity>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("campusos_student");
@@ -40,9 +55,11 @@ export default function ChatPage() {
   });
 
   const [recentLiveUpdate, setRecentLiveUpdate] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to live SSE updates for transparency indicator
-  useLiveResource("*", (key) => {
+  useLiveResource("*", () => {
     setRecentLiveUpdate(`Live DB update detected: ${new Date().toLocaleTimeString()}`);
     const timer = setTimeout(() => setRecentLiveUpdate(null), 4000);
     return () => clearTimeout(timer);
@@ -55,51 +72,178 @@ export default function ChatPage() {
     }
   };
 
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
-    reload,
-    stop,
-    setMessages,
-    append,
-  } = useChat({
-    api: "/api/chat",
-    body: {
-      student: currentStudent,
-    },
-  });
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  const stop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+  };
+
+  const sendMessage = async (userText: string) => {
+    const trimmed = userText.trim();
+    if (!trimmed || isLoading) return;
+
+    setError(null);
+    const userMessage: Message = {
+      id: "user-" + Date.now(),
+      role: "user",
+      content: trimmed,
+    };
+
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    setInput("");
+    setIsLoading(true);
+
+    const assistantMessageId = "assistant-" + Date.now();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      toolInvocations: [],
+    };
+
+    setMessages([...newMessages, assistantMessage]);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          messages: newMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          student: currentStudent,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      if (!response.body) {
+        throw new Error("No response body received from server");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let streamedContent = "";
+      const toolInvocationsMap = new Map<string, ToolInvocation>();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          // Parse AI SDK Data Stream protocol
+          // 0:"text chunk"
+          // 9:{"toolCallId":"...","toolName":"...","args":{...}}
+          // a:{"toolCallId":"...","result":{...}}
+          // e:{"finishReason":"...","usage":{...}}
+          const colonIndex = line.indexOf(":");
+          if (colonIndex === -1) continue;
+
+          const type = line.slice(0, colonIndex);
+          const rawPayload = line.slice(colonIndex + 1);
+
+          try {
+            if (type === "0") {
+              // Text token chunk
+              const textChunk = JSON.parse(rawPayload);
+              streamedContent += textChunk;
+            } else if (type === "9") {
+              // Tool call invocation
+              const toolCallData = JSON.parse(rawPayload);
+              const toolCallId = toolCallData.toolCallId || "tc-" + Date.now();
+              toolInvocationsMap.set(toolCallId, {
+                state: "call",
+                toolCallId,
+                toolName: toolCallData.toolName,
+                args: toolCallData.args || {},
+              });
+            } else if (type === "a") {
+              // Tool call result
+              const toolResultData = JSON.parse(rawPayload);
+              const toolCallId = toolResultData.toolCallId;
+              const existing = toolInvocationsMap.get(toolCallId) || {
+                state: "result",
+                toolCallId,
+                toolName: "tool",
+                args: {},
+              };
+              existing.state = "result";
+              existing.result = toolResultData.result;
+              toolInvocationsMap.set(toolCallId, existing);
+            }
+          } catch {
+            // If parsing fails for a single line, continue
+          }
+
+          // Update message state
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    content: streamedContent,
+                    toolInvocations: Array.from(toolInvocationsMap.values()),
+                  }
+                : msg
+            )
+          );
+        }
+      }
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        // User intentionally stopped generation
+        return;
+      }
+      console.error("Chat error:", err);
+      setError(err.message || "Failed to communicate with CampusOS agent");
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId
+            ? {
+                ...msg,
+                content:
+                  msg.content ||
+                  `⚠️ Error: ${err.message || "Unable to complete request. Please verify your API key in .env."}`,
+              }
+            : msg
+        )
+      );
+    } finally {
+      setIsLoading(false);
+      abortControllerRef.current = null;
+    }
+  };
+
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-
-    // Enhance prompt with active student context if performing actions
-    handleSubmit(e, {
-      body: {
-        student: currentStudent,
-      },
-    });
-  };
-
-  const handlePromptClick = (prompt: string) => {
-    if (isLoading) return;
-    append({
-      role: "user",
-      content: prompt,
-    });
+    sendMessage(input);
   };
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] flex-col gap-3">
+    <div className="flex h-[calc(100vh-5.5rem)] flex-col gap-3">
       {/* Top Bar: Student Identity & Live Sync Status */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
@@ -145,6 +289,13 @@ export default function ChatPage() {
         />
       </div>
 
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50/50 p-4 shadow-inner dark:border-neutral-800 dark:bg-neutral-950/50">
         {messages.length === 0 ? (
@@ -165,7 +316,7 @@ export default function ChatPage() {
                 <button
                   key={prompt}
                   type="button"
-                  onClick={() => handlePromptClick(prompt)}
+                  onClick={() => sendMessage(prompt)}
                   className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-700 shadow-2xs transition hover:border-neutral-300 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
                 >
                   {prompt}
@@ -199,7 +350,7 @@ export default function ChatPage() {
           <input
             type="text"
             value={input}
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about schedule, book a room, register for an event..."
             className="flex-1 bg-transparent px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none dark:text-white"
             disabled={isLoading}
@@ -207,7 +358,7 @@ export default function ChatPage() {
           {isLoading ? (
             <button
               type="button"
-              onClick={() => stop()}
+              onClick={stop}
               className="flex h-9 items-center gap-1.5 rounded-lg bg-rose-600 px-3 text-xs font-medium text-white hover:bg-rose-700"
             >
               Stop
