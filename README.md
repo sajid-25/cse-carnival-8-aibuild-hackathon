@@ -2,6 +2,45 @@
 
 An intelligent university platform powered by an AI agent that understands and acts on real-time campus data.
 
+## Local Setup
+
+### Requirements
+
+- Node.js 20 or newer
+- MySQL 8.0 or newer
+
+### Install and configure
+
+```bash
+npm install
+```
+
+Create `.env` from `.env.example` and set `DATABASE_URL` to the credentials for your local MySQL server. The database name should be `campusos`.
+
+Apply the Prisma schema and load the supplied campus records:
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+```
+
+Start the application:
+
+```bash
+npm run dev
+```
+
+The API is served by the same Next.js process. Check the database connection at `/api/health`, or query a resource such as `/api/rooms`.
+
+To reset the local data and reseed it:
+
+```bash
+npm run db:seed:force
+```
+
+Never commit `.env` or real database credentials.
+
 ---
 
 ## The Challenge

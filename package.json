@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write .",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:force": "tsx prisma/seed.ts --force"
   },
