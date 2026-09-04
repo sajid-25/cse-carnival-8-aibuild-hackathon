@@ -11,6 +11,7 @@ import {
   DoorOpen,
   Filter,
   Search,
+  Trash2,
   Users,
   Wrench,
 } from "lucide-react";
@@ -24,7 +25,20 @@ function formatEquipment(equipment: string[]) {
 }
 
 export default function RoomsPage() {
-  const { data: roomList, isLoading, error } = useApiList<Room>("/api/rooms");
+  const { data: roomList, setData: setRoomList, isLoading, error } = useApiList<Room>("/api/rooms");
+
+  async function deleteRoom(room: Room) {
+    if (!window.confirm(`Delete room ${room.room_number}?`)) return;
+    const response = await fetch(`/api/rooms/${room.id}`, { method: "DELETE" });
+    if (response.ok) setRoomList((current) => current.filter((item) => item.id !== room.id));
+  }
+
+  async function editRoom(room: Room) {
+    const capacity = window.prompt("New room capacity", String(room.capacity));
+    if (!capacity || Number(capacity) <= 0) return;
+    const response = await fetch(`/api/rooms/${room.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ capacity: Number(capacity) }) });
+    if (response.ok) setRoomList((current) => current.map((item) => item.id === room.id ? { ...item, capacity: Number(capacity) } : item));
+  }
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState<(typeof roomTypes)[number]>("all");
   const [availableOnly, setAvailableOnly] = useState(false);
@@ -128,7 +142,7 @@ export default function RoomsPage() {
         {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading rooms...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : filteredRooms.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredRooms.map((room) => (
-              <RoomCard key={room.id} room={room} />
+              <RoomCard key={room.id} room={room} onDelete={deleteRoom} onEdit={editRoom} />
             ))}
           </div>
         ) : (
@@ -161,7 +175,7 @@ function Summary({ label, value, icon: Icon, tone = "slate" }: { label: string; 
   );
 }
 
-function RoomCard({ room }: { room: Room }) {
+function RoomCard({ room, onDelete, onEdit }: { room: Room; onDelete: (room: Room) => Promise<void>; onEdit: (room: Room) => Promise<void> }) {
   const nextBooking = room.bookings[0];
   const isAvailable = room.status === "available";
 
@@ -177,9 +191,9 @@ function RoomCard({ room }: { room: Room }) {
           </div>
           <p className="mt-1 text-sm capitalize text-slate-500">{room.type} · Floor {room.floor}</p>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-600 transition group-hover:bg-teal-50 group-hover:text-teal-700">
+        <div className="flex items-center gap-1"><button aria-label={`Edit ${room.room_number}`} className="rounded p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-900" onClick={() => void onEdit(room)} type="button"><Wrench className="h-4 w-4" /></button><button aria-label={`Delete ${room.room_number}`} className="rounded p-2 text-slate-400 hover:bg-red-50 hover:text-red-700" onClick={() => void onDelete(room)} type="button"><Trash2 className="h-4 w-4" /></button><div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-600 transition group-hover:bg-teal-50 group-hover:text-teal-700">
           <DoorOpen className="h-5 w-5" />
-        </div>
+        </div></div>
       </div>
 
       <div className="mt-5 flex items-center gap-2 border-y border-slate-100 py-3 text-sm text-slate-600">

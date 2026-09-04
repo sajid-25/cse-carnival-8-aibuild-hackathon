@@ -70,6 +70,12 @@ export default function AssignmentsPage() {
     setIsAddOpen(false);
   }
 
+  async function deleteAssignment(assignment: Assignment) {
+    if (!window.confirm(`Delete "${assignment.title}"?`)) return;
+    const response = await fetch(`/api/assignments/${assignment.id}`, { method: "DELETE" });
+    if (response.ok) setAssignmentList((current) => current.filter((item) => item.id !== assignment.id));
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">
       <section className="border-b border-slate-200 bg-white">
@@ -135,7 +141,7 @@ export default function AssignmentsPage() {
         {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading assignments...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : visibleAssignments.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
             {visibleAssignments.map((assignment) => (
-              <AssignmentCard assignment={assignment} key={assignment.id} />
+              <AssignmentCard assignment={assignment} key={assignment.id} onDelete={deleteAssignment} />
             ))}
           </div>
         ) : (
@@ -176,7 +182,7 @@ function Summary({ label, value, tone = "slate" }: { label: string; value: numbe
   );
 }
 
-function AssignmentCard({ assignment }: { assignment: Assignment }) {
+function AssignmentCard({ assignment, onDelete }: { assignment: Assignment; onDelete: (assignment: Assignment) => Promise<void> }) {
   const isSubmitted = assignment.status === "submitted" || assignment.status === "graded";
   const isOverdue = assignment.status === "pending" && assignment.deadline < today;
   const isDueSoon = assignment.status === "pending" && assignment.deadline >= today && assignment.deadline <= dueSoonLimit;
@@ -196,7 +202,7 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button aria-label={`Edit ${assignment.title}`} className="rounded p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900"><Pencil className="h-4 w-4" /></button>
-          <button aria-label={`Delete ${assignment.title}`} className="rounded p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+          <button aria-label={`Delete ${assignment.title}`} className="rounded p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-700" onClick={() => void onDelete(assignment)} type="button"><Trash2 className="h-4 w-4" /></button>
         </div>
       </div>
       <p className="mt-4 line-clamp-3 text-sm leading-5 text-slate-600">{assignment.description}</p>

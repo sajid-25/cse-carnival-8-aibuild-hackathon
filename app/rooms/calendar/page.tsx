@@ -33,6 +33,12 @@ export default function BookingCalendarPage() {
     setIsBookingOpen(false);
   }
 
+  async function cancelBooking(bookingId: string, roomId: string) {
+    if (!window.confirm("Cancel this room booking?")) return;
+    const response = await fetch(`/api/rooms/${roomId}/bookings/${bookingId}`, { method: "DELETE" });
+    if (response.ok) await reload();
+  }
+
   if (isLoading) return <div className="p-8 text-sm text-slate-500">Loading booking calendar...</div>;
   if (error) return <div className="p-8 text-sm text-red-700">{error}</div>;
 

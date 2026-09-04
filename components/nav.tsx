@@ -9,7 +9,6 @@ import {
   Sparkles, 
   Megaphone, 
   BookOpenCheck, 
-  BotMessageSquare,
   GraduationCap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,7 +20,6 @@ const navItems = [
   { label: "Events", href: "/events", icon: Sparkles },
   { label: "Announcements", href: "/announcements", icon: Megaphone },
   { label: "Assignments", href: "/assignments", icon: BookOpenCheck },
-  { label: "Chat", href: "/chat", icon: BotMessageSquare },
 ];
 
 export function TopNav() {

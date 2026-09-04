@@ -10,6 +10,7 @@ import {
   MapPin,
   Search,
   Sparkles,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
@@ -89,6 +90,12 @@ export default function EventsPage() {
     if (response.ok) await loadEvents();
   }
 
+  async function deleteEvent(event: Event) {
+    if (!window.confirm(`Delete "${event.name}"?`)) return;
+    const response = await fetch(`/api/events/${event.id}`, { method: "DELETE" });
+    if (response.ok) setEventList((current) => current.filter((item) => item.id !== event.id));
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">
       <section className="border-b border-slate-200 bg-white">
@@ -154,7 +161,7 @@ export default function EventsPage() {
         {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading events...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : filteredEvents.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredEvents.map((event) => (
-              <EventCard event={event} key={event.id} onRegister={registerEvent} />
+              <EventCard event={event} key={event.id} onRegister={registerEvent} onDelete={deleteEvent} />
             ))}
           </div>
         ) : (
@@ -196,7 +203,7 @@ function Summary({ label, value, tone = "slate" }: { label: string; value: numbe
   );
 }
 
-function EventCard({ event, onRegister }: { event: Event; onRegister: (event: Event) => Promise<void> }) {
+function EventCard({ event, onRegister, onDelete }: { event: Event; onRegister: (event: Event) => Promise<void>; onDelete: (event: Event) => Promise<void> }) {
   const spotsLeft = Math.max(event.capacity - event.registered, 0);
   const isFull = event.status === "full" || spotsLeft === 0;
   const registrationPercentage = Math.min((event.registered / event.capacity) * 100, 100);
@@ -218,6 +225,9 @@ function EventCard({ event, onRegister }: { event: Event; onRegister: (event: Ev
           <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${isFull ? "bg-amber-50 text-amber-700" : event.status === "cancelled" ? "bg-red-50 text-red-700" : "bg-teal-50 text-teal-700"}`}>
             {isFull ? "Full" : event.status}
           </span>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <button aria-label={`Delete ${event.name}`} className="rounded p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-700" onClick={() => void onDelete(event)} type="button"><Trash2 className="h-4 w-4" /></button>
         </div>
         <p className="mt-4 line-clamp-2 min-h-10 text-sm leading-5 text-slate-500">{event.description}</p>
       </div>
