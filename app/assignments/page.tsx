@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import assignments from "@/data/assignments.json";
+import { useApiList } from "@/lib/use-api-list";
 import {
   BookOpenCheck,
   CalendarClock,
@@ -29,7 +30,7 @@ function formatDate(date: string) {
 }
 
 export default function AssignmentsPage() {
-  const [assignmentList, setAssignmentList] = useState<Assignment[]>(assignments);
+  const { data: assignmentList, setData: setAssignmentList, isLoading, error } = useApiList<Assignment>("/api/assignments");
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<AssignmentFilter>("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -58,10 +59,13 @@ export default function AssignmentsPage() {
   ).length;
   const totalMarks = assignmentList.reduce((total, assignment) => total + assignment.marks, 0);
 
-  function addAssignment(event: FormEvent<HTMLFormElement>) {
+  async function addAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!newAssignment.course || !newAssignment.course_title || !newAssignment.title || !newAssignment.description || !newAssignment.deadline || !newAssignment.submission_platform || !newAssignment.marks) return;
-    setAssignmentList((current) => [{ id: `asgn-${Date.now()}`, ...newAssignment, marks: Number(newAssignment.marks) } as Assignment, ...current]);
+    const response = await fetch("/api/assignments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...newAssignment, assigned_date: today, marks: Number(newAssignment.marks) }) });
+    if (!response.ok) return;
+    const createdAssignment = await response.json();
+    setAssignmentList((current) => [createdAssignment, ...current]);
     setNewAssignment({ course: "", course_title: "", title: "", description: "", deadline: "", submission_platform: "", status: "pending", marks: "" });
     setIsAddOpen(false);
   }
@@ -128,7 +132,7 @@ export default function AssignmentsPage() {
           <span className="hidden text-xs text-slate-400 sm:inline">{dueSoonCount} pending due by {formatDate(dueSoonLimit)}</span>
         </div>
 
-        {visibleAssignments.length > 0 ? (
+        {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading assignments...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : visibleAssignments.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
             {visibleAssignments.map((assignment) => (
               <AssignmentCard assignment={assignment} key={assignment.id} />

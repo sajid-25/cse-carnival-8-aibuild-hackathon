@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import rooms from "@/data/rooms.json";
+import { useApiList } from "@/lib/use-api-list";
 import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, DoorOpen, Plus, Users, X } from "lucide-react";
 
 type Room = (typeof rooms)[number];
@@ -14,19 +15,26 @@ function formatDate(date: string) {
 
 export default function BookingCalendarPage() {
   const [selectedDate, setSelectedDate] = useState(calendarDates[0]);
-  const [roomList, setRoomList] = useState<Room[]>(rooms);
+  const { data: roomList, isLoading, error, reload } = useApiList<Room>("/api/rooms");
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [booking, setBooking] = useState({ roomNumber: "", startTime: "", endTime: "", bookedBy: "", purpose: "" });
 
   const bookingsForDate = useMemo(() => roomList.flatMap((room) => room.bookings.filter((item) => item.date === selectedDate).map((item) => ({ ...item, roomNumber: room.room_number }))), [roomList, selectedDate]);
 
-  function createBooking(event: FormEvent<HTMLFormElement>) {
+  async function createBooking(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!booking.roomNumber || !booking.startTime || !booking.endTime || !booking.bookedBy || !booking.purpose) return;
-    setRoomList((current) => current.map((room) => room.room_number !== booking.roomNumber ? room : { ...room, bookings: [...room.bookings, { booking_id: `bk-${Date.now()}`, booked_by: booking.bookedBy, date: selectedDate, start_time: booking.startTime, end_time: booking.endTime, purpose: booking.purpose }] }));
+    const room = roomList.find((item) => item.room_number === booking.roomNumber);
+    if (!room) return;
+    const response = await fetch(`/api/rooms/${room.id}/bookings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ booked_by: booking.bookedBy, date: selectedDate, start_time: booking.startTime, end_time: booking.endTime, purpose: booking.purpose }) });
+    if (!response.ok) return;
+    await reload();
     setBooking({ roomNumber: "", startTime: "", endTime: "", bookedBy: "", purpose: "" });
     setIsBookingOpen(false);
   }
+
+  if (isLoading) return <div className="p-8 text-sm text-slate-500">Loading booking calendar...</div>;
+  if (error) return <div className="p-8 text-sm text-red-700">{error}</div>;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">

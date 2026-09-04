@@ -1,10 +1,6 @@
 import Link from "next/link";
 import { CalendarDays, ChevronRight, Clock3, DoorOpen, Megaphone, Sparkles, TrendingUp } from "lucide-react";
-import announcements from "@/data/announcements.json";
-import assignments from "@/data/assignments.json";
-import events from "@/data/events.json";
-import rooms from "@/data/rooms.json";
-import schedules from "@/data/schedules.json";
+import db from "@/lib/db";
 
 const today = "2026-09-04";
 
@@ -12,7 +8,14 @@ function formatDate(date: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${date}T00:00:00`));
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [announcements, assignments, events, rooms, schedules] = await Promise.all([
+    db.announcement.findMany(),
+    db.assignment.findMany(),
+    db.event.findMany(),
+    db.room.findMany(),
+    db.schedule.findMany(),
+  ]);
   const urgentAnnouncements = announcements.filter((announcement) => announcement.priority === "high" && announcement.expires >= today).slice(0, 3);
   const upcomingAssignments = assignments.filter((assignment) => assignment.status === "pending").sort((first, second) => first.deadline.localeCompare(second.deadline)).slice(0, 3);
   const upcomingEvents = events.filter((event) => event.status === "upcoming").sort((first, second) => first.date.localeCompare(second.date)).slice(0, 3);
