@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import rooms from "@/data/rooms.json";
+import { useApiList } from "@/lib/use-api-list";
 import {
   CalendarDays,
   CheckCircle2,
@@ -23,6 +24,7 @@ function formatEquipment(equipment: string[]) {
 }
 
 export default function RoomsPage() {
+  const { data: roomList, isLoading, error } = useApiList<Room>("/api/rooms");
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState<(typeof roomTypes)[number]>("all");
   const [availableOnly, setAvailableOnly] = useState(false);
@@ -30,7 +32,7 @@ export default function RoomsPage() {
   const filteredRooms = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return rooms.filter((room) => {
+    return roomList.filter((room) => {
       const matchesQuery =
         !normalizedQuery ||
         [room.room_number, room.type, ...room.equipment].some((value) =>
@@ -41,11 +43,11 @@ export default function RoomsPage() {
 
       return matchesQuery && matchesType && matchesAvailability;
     });
-  }, [availableOnly, query, selectedType]);
+  }, [availableOnly, query, roomList, selectedType]);
 
-  const availableCount = rooms.filter((room) => room.status === "available").length;
-  const bookedCount = rooms.length - availableCount;
-  const labCount = rooms.filter((room) => room.type === "lab").length;
+  const availableCount = roomList.filter((room) => room.status === "available").length;
+  const bookedCount = roomList.length - availableCount;
+  const labCount = roomList.filter((room) => room.type === "lab").length;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">
@@ -71,7 +73,7 @@ export default function RoomsPage() {
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">
-            <Summary label="Total rooms" value={rooms.length} icon={DoorOpen} />
+            <Summary label="Total rooms" value={roomList.length} icon={DoorOpen} />
             <Summary label="Available now" value={availableCount} icon={CheckCircle2} tone="teal" />
             <Summary label="With bookings" value={bookedCount} icon={CalendarDays} tone="amber" />
             <Summary label="Computer labs" value={labCount} icon={Wrench} />
@@ -118,12 +120,12 @@ export default function RoomsPage() {
 
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-slate-500">
-            Showing <span className="font-semibold text-slate-900">{filteredRooms.length}</span> of {rooms.length} rooms
+            Showing <span className="font-semibold text-slate-900">{filteredRooms.length}</span> of {roomList.length} rooms
           </p>
           <span className="text-xs text-slate-400">Updated from campus data</span>
         </div>
 
-        {filteredRooms.length > 0 ? (
+        {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading rooms...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : filteredRooms.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredRooms.map((room) => (
               <RoomCard key={room.id} room={room} />
