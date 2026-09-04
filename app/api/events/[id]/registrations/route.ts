@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
-import { apiError, isRecord, requireFields } from "@/lib/api";
+import { POST as registerRoute } from "@/app/api/events/[id]/register/route";
+
+export const dynamic = "force-dynamic";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest, context: Context) {
       await transaction.event.update({ where: { id: eventId }, data: { registered: { increment: 1 }, status: currentEvent.registered + 1 >= currentEvent.capacity ? "full" : currentEvent.status } });
       return created;
     });
-    return NextResponse.json(registration, { status: 201 });
+    return NextResponse.json(registrations);
   } catch (error) {
     if (error instanceof Error && error.message === "EVENT_FULL") return apiError("Event is full.", 409);
     if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") return apiError("Student is already registered for this event.", 409);
@@ -49,3 +51,5 @@ export async function POST(request: NextRequest, context: Context) {
     return apiError("Unable to register for event.", 500);
   }
 }
+
+export const POST = registerRoute;
