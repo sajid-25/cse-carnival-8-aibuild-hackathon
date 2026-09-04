@@ -11,6 +11,7 @@ import {
   Search,
   Sparkles,
   Users,
+  X,
 } from "lucide-react";
 
 type Event = (typeof events)[number];
@@ -25,13 +26,16 @@ function formatDate(date: string) {
 }
 
 export default function EventsPage() {
+  const [eventList, setEventList] = useState<Event[]>(events);
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<EventFilter>("all");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newEvent, setNewEvent] = useState({ name: "", date: "", start_time: "", end_time: "", venue: "", capacity: "" });
 
   const filteredEvents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return events
+    return eventList
       .filter((event) => {
         const matchesQuery =
           !normalizedQuery ||
@@ -42,11 +46,37 @@ export default function EventsPage() {
         return matchesQuery && matchesFilter;
       })
       .sort((first, second) => first.date.localeCompare(second.date));
-  }, [activeFilter, query]);
+  }, [activeFilter, eventList, query]);
 
-  const openSpots = events.reduce((total, event) => total + Math.max(event.capacity - event.registered, 0), 0);
-  const registeredTotal = events.reduce((total, event) => total + event.registered, 0);
-  const upcomingCount = events.filter((event) => event.status === "upcoming").length;
+  const openSpots = eventList.reduce((total, event) => total + Math.max(event.capacity - event.registered, 0), 0);
+  const registeredTotal = eventList.reduce((total, event) => total + event.registered, 0);
+  const upcomingCount = eventList.filter((event) => event.status === "upcoming").length;
+
+  function addEvent(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newEvent.name || !newEvent.date || !newEvent.start_time || !newEvent.end_time || !newEvent.venue || !newEvent.capacity) return;
+
+    setEventList((current) => [
+      ...current,
+      {
+        id: `evt-${Date.now()}`,
+        name: newEvent.name,
+        description: "New campus event",
+        date: newEvent.date,
+        start_time: newEvent.start_time,
+        end_time: newEvent.end_time,
+        end_date: newEvent.date,
+        venue: newEvent.venue,
+        organizer: "CampusOS user",
+        capacity: Number(newEvent.capacity),
+        registered: 0,
+        registrations: [],
+        status: "upcoming",
+      } as Event,
+    ]);
+    setNewEvent({ name: "", date: "", start_time: "", end_time: "", venue: "", capacity: "" });
+    setIsAddOpen(false);
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">
@@ -63,7 +93,7 @@ export default function EventsPage() {
                 Find talks, workshops, contests, and student activities. Reserve a place before the room fills up.
               </p>
             </div>
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800">
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800" onClick={() => setIsAddOpen(true)} type="button">
               <CalendarDays className="h-4 w-4" />
               Add an event
             </button>
@@ -105,7 +135,7 @@ export default function EventsPage() {
 
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-slate-500">
-            Showing <span className="font-semibold text-slate-900">{filteredEvents.length}</span> of {events.length} events
+            Showing <span className="font-semibold text-slate-900">{filteredEvents.length}</span> of {eventList.length} events
           </p>
           <span className="hidden text-xs text-slate-400 sm:inline">Updated from campus data</span>
         </div>
@@ -124,6 +154,23 @@ export default function EventsPage() {
           </div>
         )}
       </main>
+
+      {isAddOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4" role="presentation">
+          <div aria-labelledby="add-event-title" aria-modal="true" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-2xl" role="dialog">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 className="text-lg font-semibold text-slate-950" id="add-event-title">Add an event</h2><p className="mt-1 text-sm text-slate-500">Create a campus event and add it to the calendar.</p></div>
+              <button aria-label="Close add event dialog" className="rounded p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-900" onClick={() => setIsAddOpen(false)} type="button"><X className="h-4 w-4" /></button>
+            </div>
+            <form className="mt-6 grid gap-4" onSubmit={addEvent}>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Event name<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" onChange={(event) => setNewEvent({ ...newEvent, name: event.target.value })} value={newEvent.name} /></label>
+              <div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Date<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" onChange={(event) => setNewEvent({ ...newEvent, date: event.target.value })} type="date" value={newEvent.date} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Venue<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" onChange={(event) => setNewEvent({ ...newEvent, venue: event.target.value })} placeholder="7C01" value={newEvent.venue} /></label></div>
+              <div className="grid gap-4 sm:grid-cols-3"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Start<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" onChange={(event) => setNewEvent({ ...newEvent, start_time: event.target.value })} type="time" value={newEvent.start_time} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">End<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" onChange={(event) => setNewEvent({ ...newEvent, end_time: event.target.value })} type="time" value={newEvent.end_time} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Capacity<input required min="1" className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" onChange={(event) => setNewEvent({ ...newEvent, capacity: event.target.value })} type="number" value={newEvent.capacity} /></label></div>
+              <div className="mt-2 flex justify-end gap-2"><button className="rounded-md px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setIsAddOpen(false)} type="button">Cancel</button><button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">Create event</button></div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

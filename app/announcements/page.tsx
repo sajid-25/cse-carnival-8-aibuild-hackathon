@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import announcements from "@/data/announcements.json";
 import {
   AlertCircle,
@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 
 type Announcement = (typeof announcements)[number];
@@ -26,14 +27,17 @@ function formatDate(date: string) {
 }
 
 export default function AnnouncementsPage() {
+  const [announcementList, setAnnouncementList] = useState<Announcement[]>(announcements);
   const [query, setQuery] = useState("");
   const [priority, setPriority] = useState<PriorityFilter>("all");
   const [showExpired, setShowExpired] = useState(false);
+  const [isPostOpen, setIsPostOpen] = useState(false);
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: "", body: "", priority: "medium" as PriorityFilter, posted_by: "", expires: "" });
 
   const visibleAnnouncements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return announcements
+    return announcementList
       .filter((announcement) => {
         const matchesQuery =
           !normalizedQuery ||
@@ -45,13 +49,21 @@ export default function AnnouncementsPage() {
         return matchesQuery && matchesPriority && (showExpired || !isExpired);
       })
       .sort((first, second) => second.date.localeCompare(first.date));
-  }, [priority, query, showExpired]);
+  }, [announcementList, priority, query, showExpired]);
 
-  const activeCount = announcements.filter((announcement) => announcement.expires >= today).length;
-  const highPriorityCount = announcements.filter((announcement) => announcement.priority === "high").length;
-  const expiringSoonCount = announcements.filter(
+  const activeCount = announcementList.filter((announcement) => announcement.expires >= today).length;
+  const highPriorityCount = announcementList.filter((announcement) => announcement.priority === "high").length;
+  const expiringSoonCount = announcementList.filter(
     (announcement) => announcement.expires >= today && announcement.expires <= "2026-09-10",
   ).length;
+
+  function postAnnouncement(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newAnnouncement.title || !newAnnouncement.body || !newAnnouncement.posted_by || !newAnnouncement.expires) return;
+    setAnnouncementList((current) => [{ id: `ann-${Date.now()}`, ...newAnnouncement, date: today } as Announcement, ...current]);
+    setNewAnnouncement({ title: "", body: "", priority: "medium", posted_by: "", expires: "" });
+    setIsPostOpen(false);
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">
@@ -68,7 +80,7 @@ export default function AnnouncementsPage() {
                 Important notices, course updates, and deadlines in one place. High-priority updates stay easy to spot.
               </p>
             </div>
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800">
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800" onClick={() => setIsPostOpen(true)} type="button">
               <Plus className="h-4 w-4" />
               Post announcement
             </button>
@@ -116,7 +128,7 @@ export default function AnnouncementsPage() {
 
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-slate-500">
-            Showing <span className="font-semibold text-slate-900">{visibleAnnouncements.length}</span> of {announcements.length} notices
+            Showing <span className="font-semibold text-slate-900">{visibleAnnouncements.length}</span> of {announcementList.length} notices
           </p>
           <span className="hidden text-xs text-slate-400 sm:inline">Updated from campus data</span>
         </div>
@@ -135,6 +147,20 @@ export default function AnnouncementsPage() {
           </div>
         )}
       </main>
+
+      {isPostOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4">
+          <div aria-labelledby="post-announcement-title" aria-modal="true" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-2xl" role="dialog">
+            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-950" id="post-announcement-title">Post announcement</h2><p className="mt-1 text-sm text-slate-500">Share a notice with the campus.</p></div><button aria-label="Close post announcement dialog" className="rounded p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-900" onClick={() => setIsPostOpen(false)} type="button"><X className="h-4 w-4" /></button></div>
+            <form className="mt-6 grid gap-4" onSubmit={postAnnouncement}>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Title<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAnnouncement({ ...newAnnouncement, title: event.target.value })} value={newAnnouncement.title} /></label>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Body<textarea required className="min-h-24 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAnnouncement({ ...newAnnouncement, body: event.target.value })} value={newAnnouncement.body} /></label>
+              <div className="grid gap-4 sm:grid-cols-3"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Priority<select className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal capitalize text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAnnouncement({ ...newAnnouncement, priority: event.target.value as PriorityFilter })} value={newAnnouncement.priority}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Posted by<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAnnouncement({ ...newAnnouncement, posted_by: event.target.value })} value={newAnnouncement.posted_by} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Expires<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAnnouncement({ ...newAnnouncement, expires: event.target.value })} type="date" value={newAnnouncement.expires} /></label></div>
+              <div className="mt-2 flex justify-end gap-2"><button className="rounded-md px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setIsPostOpen(false)} type="button">Cancel</button><button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">Post announcement</button></div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

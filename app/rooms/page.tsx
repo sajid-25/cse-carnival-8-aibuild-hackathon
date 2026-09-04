@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import rooms from "@/data/rooms.json";
 import {
   CalendarDays,
@@ -63,10 +64,10 @@ export default function RoomsPage() {
                 Browse rooms by capacity, type, and equipment. Live bookings will appear here as soon as they are added.
               </p>
             </div>
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800">
+            <Link className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800" href="/rooms/calendar">
               <CalendarDays className="h-4 w-4" />
               View booking calendar
-            </button>
+            </Link>
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">

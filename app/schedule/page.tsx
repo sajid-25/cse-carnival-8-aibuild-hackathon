@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import schedules from "@/data/schedules.json";
 import {
   CalendarDays,
@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   UserRound,
+  X,
 } from "lucide-react";
 
 type Schedule = (typeof schedules)[number];
@@ -21,12 +22,15 @@ function dayAbbreviation(day: string) {
 }
 
 export default function SchedulePage() {
+  const [scheduleList, setScheduleList] = useState<Schedule[]>(schedules);
   const [selectedDay, setSelectedDay] = useState<(typeof days)[number]>("Sunday");
   const [query, setQuery] = useState("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newClass, setNewClass] = useState({ course: "", title: "", day: "Sunday" as (typeof days)[number], start_time: "", end_time: "", room: "", instructor: "", section: "" });
 
   const visibleClasses = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return schedules
+    return scheduleList
       .filter((schedule) => {
         const matchesDay = schedule.day === selectedDay;
         const matchesQuery =
@@ -37,12 +41,21 @@ export default function SchedulePage() {
         return matchesDay && matchesQuery;
       })
       .sort((first, second) => first.start_time.localeCompare(second.start_time));
-  }, [query, selectedDay]);
+  }, [query, scheduleList, selectedDay]);
 
   const busiestDay = days.reduce((busiest, day) => {
-    const count = schedules.filter((schedule) => schedule.day === day).length;
+    const count = scheduleList.filter((schedule) => schedule.day === day).length;
     return count > busiest.count ? { day, count } : busiest;
   }, { day: days[0], count: 0 });
+
+  function addClass(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newClass.course || !newClass.title || !newClass.start_time || !newClass.end_time || !newClass.room || !newClass.instructor || !newClass.section) return;
+    setScheduleList((current) => [...current, { id: `sch-${Date.now()}`, ...newClass } as Schedule]);
+    setSelectedDay(newClass.day);
+    setNewClass({ course: "", title: "", day: "Sunday", start_time: "", end_time: "", room: "", instructor: "", section: "" });
+    setIsAddOpen(false);
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">
@@ -59,17 +72,17 @@ export default function SchedulePage() {
                 Keep every class, lab, room, and instructor in view across the university week.
               </p>
             </div>
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800">
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800" onClick={() => setIsAddOpen(true)} type="button">
               <Plus className="h-4 w-4" />
               Add class
             </button>
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">
-            <Summary label="Weekly classes" value={schedules.length} />
-            <Summary label="Course sections" value={new Set(schedules.map((schedule) => schedule.course)).size} tone="teal" />
+            <Summary label="Weekly classes" value={scheduleList.length} />
+            <Summary label="Course sections" value={new Set(scheduleList.map((schedule) => schedule.course)).size} tone="teal" />
             <Summary label="Busiest day" value={busiestDay.count} detail={busiestDay.day} tone="amber" />
-            <Summary label="Teaching rooms" value={new Set(schedules.map((schedule) => schedule.room)).size} />
+            <Summary label="Teaching rooms" value={new Set(scheduleList.map((schedule) => schedule.room)).size} />
           </div>
         </div>
       </section>
@@ -116,6 +129,8 @@ export default function SchedulePage() {
           </div>
         )}
       </main>
+
+      {isAddOpen && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4"><div aria-labelledby="add-class-title" aria-modal="true" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl" role="dialog"><div className="flex items-start justify-between"><div><h2 className="text-lg font-semibold text-slate-950" id="add-class-title">Add class</h2><p className="mt-1 text-sm text-slate-500">Add a lecture or lab to the timetable.</p></div><button aria-label="Close add class dialog" className="rounded p-2 text-slate-400 hover:bg-slate-100" onClick={() => setIsAddOpen(false)} type="button"><X className="h-4 w-4" /></button></div><form className="mt-6 grid gap-4" onSubmit={addClass}><div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Course code<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900" onChange={(event) => setNewClass({ ...newClass, course: event.target.value })} placeholder="CSE 4113" value={newClass.course} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Course title<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900" onChange={(event) => setNewClass({ ...newClass, title: event.target.value })} value={newClass.title} /></label></div><div className="grid gap-4 sm:grid-cols-3"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Day<select className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900" onChange={(event) => setNewClass({ ...newClass, day: event.target.value as (typeof days)[number] })} value={newClass.day}>{days.map((day) => <option key={day}>{day}</option>)}</select></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Start<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900" onChange={(event) => setNewClass({ ...newClass, start_time: event.target.value })} type="time" value={newClass.start_time} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">End<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900" onChange={(event) => setNewClass({ ...newClass, end_time: event.target.value })} type="time" value={newClass.end_time} /></label></div><div className="grid gap-4 sm:grid-cols-3"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Room<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900" onChange={(event) => setNewClass({ ...newClass, room: event.target.value })} placeholder="7A03" value={newClass.room} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Instructor<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900" onChange={(event) => setNewClass({ ...newClass, instructor: event.target.value })} value={newClass.instructor} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Section<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900" onChange={(event) => setNewClass({ ...newClass, section: event.target.value })} placeholder="B" value={newClass.section} /></label></div><div className="flex justify-end gap-2"><button className="rounded-md px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setIsAddOpen(false)} type="button">Cancel</button><button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">Add class</button></div></form></div></div>}
     </div>
   );
 }

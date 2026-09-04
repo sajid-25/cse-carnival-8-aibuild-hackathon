@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import assignments from "@/data/assignments.json";
 import {
   BookOpenCheck,
@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 
 type Assignment = (typeof assignments)[number];
@@ -28,13 +29,16 @@ function formatDate(date: string) {
 }
 
 export default function AssignmentsPage() {
+  const [assignmentList, setAssignmentList] = useState<Assignment[]>(assignments);
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<AssignmentFilter>("all");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newAssignment, setNewAssignment] = useState({ course: "", course_title: "", title: "", description: "", deadline: "", submission_platform: "", status: "pending", marks: "" });
 
   const visibleAssignments = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return assignments
+    return assignmentList
       .filter((assignment) => {
         const matchesQuery =
           !normalizedQuery ||
@@ -45,14 +49,22 @@ export default function AssignmentsPage() {
         return matchesQuery && matchesFilter;
       })
       .sort((first, second) => first.deadline.localeCompare(second.deadline));
-  }, [activeFilter, query]);
+  }, [activeFilter, assignmentList, query]);
 
-  const pendingCount = assignments.filter((assignment) => assignment.status === "pending").length;
-  const submittedCount = assignments.filter((assignment) => assignment.status === "submitted").length;
-  const dueSoonCount = assignments.filter(
+  const pendingCount = assignmentList.filter((assignment) => assignment.status === "pending").length;
+  const submittedCount = assignmentList.filter((assignment) => assignment.status === "submitted").length;
+  const dueSoonCount = assignmentList.filter(
     (assignment) => assignment.status === "pending" && assignment.deadline >= today && assignment.deadline <= dueSoonLimit,
   ).length;
-  const totalMarks = assignments.reduce((total, assignment) => total + assignment.marks, 0);
+  const totalMarks = assignmentList.reduce((total, assignment) => total + assignment.marks, 0);
+
+  function addAssignment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newAssignment.course || !newAssignment.course_title || !newAssignment.title || !newAssignment.description || !newAssignment.deadline || !newAssignment.submission_platform || !newAssignment.marks) return;
+    setAssignmentList((current) => [{ id: `asgn-${Date.now()}`, ...newAssignment, marks: Number(newAssignment.marks) } as Assignment, ...current]);
+    setNewAssignment({ course: "", course_title: "", title: "", description: "", deadline: "", submission_platform: "", status: "pending", marks: "" });
+    setIsAddOpen(false);
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">
@@ -69,14 +81,14 @@ export default function AssignmentsPage() {
                 See what is due next, where to submit it, and which work is already complete.
               </p>
             </div>
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800">
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800" onClick={() => setIsAddOpen(true)} type="button">
               <Plus className="h-4 w-4" />
               Add assignment
             </button>
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">
-            <Summary label="Total assignments" value={assignments.length} />
+            <Summary label="Total assignments" value={assignmentList.length} />
             <Summary label="Pending" value={pendingCount} tone="amber" />
             <Summary label="Submitted" value={submittedCount} tone="teal" />
             <Summary label="Marks available" value={totalMarks} />
@@ -111,7 +123,7 @@ export default function AssignmentsPage() {
 
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-slate-500">
-            Showing <span className="font-semibold text-slate-900">{visibleAssignments.length}</span> of {assignments.length} assignments
+            Showing <span className="font-semibold text-slate-900">{visibleAssignments.length}</span> of {assignmentList.length} assignments
           </p>
           <span className="hidden text-xs text-slate-400 sm:inline">{dueSoonCount} pending due by {formatDate(dueSoonLimit)}</span>
         </div>
@@ -130,6 +142,22 @@ export default function AssignmentsPage() {
           </div>
         )}
       </main>
+
+      {isAddOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4">
+          <div aria-labelledby="add-assignment-title" aria-modal="true" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 shadow-2xl" role="dialog">
+            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-950" id="add-assignment-title">Add assignment</h2><p className="mt-1 text-sm text-slate-500">Keep a new piece of work on your deadline list.</p></div><button aria-label="Close add assignment dialog" className="rounded p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-900" onClick={() => setIsAddOpen(false)} type="button"><X className="h-4 w-4" /></button></div>
+            <form className="mt-6 grid gap-4" onSubmit={addAssignment}>
+              <div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Course code<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAssignment({ ...newAssignment, course: event.target.value })} placeholder="CSE 4113" value={newAssignment.course} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Course title<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAssignment({ ...newAssignment, course_title: event.target.value })} value={newAssignment.course_title} /></label></div>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Assignment title<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAssignment({ ...newAssignment, title: event.target.value })} value={newAssignment.title} /></label>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Description<textarea required className="min-h-24 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAssignment({ ...newAssignment, description: event.target.value })} value={newAssignment.description} /></label>
+              <div className="grid gap-4 sm:grid-cols-3"><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Deadline<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAssignment({ ...newAssignment, deadline: event.target.value })} type="date" value={newAssignment.deadline} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Marks<input required min="1" className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAssignment({ ...newAssignment, marks: event.target.value })} type="number" value={newAssignment.marks} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-600">Status<select className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal capitalize text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAssignment({ ...newAssignment, status: event.target.value })} value={newAssignment.status}><option value="pending">Pending</option><option value="submitted">Submitted</option><option value="graded">Graded</option><option value="late">Late</option></select></label></div>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-600">Submission platform<input required className="h-10 rounded-md border border-slate-300 px-3 text-sm font-normal text-slate-900 outline-none focus:border-teal-600" onChange={(event) => setNewAssignment({ ...newAssignment, submission_platform: event.target.value })} placeholder="Google Classroom" value={newAssignment.submission_platform} /></label>
+              <div className="mt-2 flex justify-end gap-2"><button className="rounded-md px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setIsAddOpen(false)} type="button">Cancel</button><button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">Add assignment</button></div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
