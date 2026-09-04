@@ -69,6 +69,12 @@ export default function AnnouncementsPage() {
     setIsPostOpen(false);
   }
 
+  async function deleteAnnouncement(announcement: Announcement) {
+    if (!window.confirm(`Delete "${announcement.title}"?`)) return;
+    const response = await fetch(`/api/announcements/${announcement.id}`, { method: "DELETE" });
+    if (response.ok) setAnnouncementList((current) => current.filter((item) => item.id !== announcement.id));
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7f8]">
       <section className="border-b border-slate-200 bg-white">
@@ -140,7 +146,7 @@ export default function AnnouncementsPage() {
         {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading announcements...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : visibleAnnouncements.length > 0 ? (
           <div className="space-y-4">
             {visibleAnnouncements.map((announcement) => (
-              <AnnouncementCard announcement={announcement} key={announcement.id} />
+              <AnnouncementCard announcement={announcement} key={announcement.id} onDelete={deleteAnnouncement} />
             ))}
           </div>
         ) : (
@@ -179,7 +185,7 @@ function Summary({ label, value, tone = "slate" }: { label: string; value: numbe
   );
 }
 
-function AnnouncementCard({ announcement }: { announcement: Announcement }) {
+function AnnouncementCard({ announcement, onDelete }: { announcement: Announcement; onDelete: (announcement: Announcement) => Promise<void> }) {
   const isExpired = announcement.expires < today;
   const priorityStyles = {
     high: { border: "border-l-red-500", badge: "bg-red-50 text-red-700", label: "High priority" },
@@ -204,7 +210,7 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
         </div>
         <div className="flex shrink-0 items-center gap-1 self-end sm:self-start">
           <button aria-label={`Edit ${announcement.title}`} className="rounded p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900"><Pencil className="h-4 w-4" /></button>
-          <button aria-label={`Delete ${announcement.title}`} className="rounded p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+          <button aria-label={`Delete ${announcement.title}`} className="rounded p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-700" onClick={() => void onDelete(announcement)} type="button"><Trash2 className="h-4 w-4" /></button>
           <button aria-label={`View ${announcement.title}`} className="rounded p-2 text-slate-400 transition hover:bg-teal-50 hover:text-teal-700"><ChevronRight className="h-4 w-4" /></button>
         </div>
       </div>

@@ -53,7 +53,7 @@ export default async function HomePage() {
               <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Good morning, Sakibul</h1>
               <p className="mt-2 text-sm leading-6 text-slate-500">Here is what needs your attention across campus today.</p>
             </div>
-            <Link className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800" href="/chat"><Sparkles className="h-4 w-4" />Ask CampusOS</Link>
+            <Link className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800" href="/events"><Sparkles className="h-4 w-4" />View campus events</Link>
           </div>
           <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">
             <Metric label="Classes this week" value={schedules.length} href="/schedule" icon={CalendarDays} />

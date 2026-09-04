@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
@@ -59,6 +60,19 @@ export default function SchedulePage() {
     setSelectedDay(newClass.day);
     setNewClass({ course: "", title: "", day: "Sunday", start_time: "", end_time: "", room: "", instructor: "", section: "" });
     setIsAddOpen(false);
+  }
+
+  async function editClass(schedule: Schedule) {
+    const title = window.prompt("New course title", schedule.title);
+    if (!title || title === schedule.title) return;
+    const response = await fetch(`/api/schedules/${schedule.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
+    if (response.ok) setScheduleList((current) => current.map((item) => item.id === schedule.id ? { ...item, title } : item));
+  }
+
+  async function deleteClass(schedule: Schedule) {
+    if (!window.confirm(`Delete ${schedule.course} from the schedule?`)) return;
+    const response = await fetch(`/api/schedules/${schedule.id}`, { method: "DELETE" });
+    if (response.ok) setScheduleList((current) => current.filter((item) => item.id !== schedule.id));
   }
 
   return (
@@ -123,7 +137,7 @@ export default function SchedulePage() {
 
         {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading schedule...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : visibleClasses.length > 0 ? (
           <div className="space-y-3">
-            {visibleClasses.map((schedule) => <ScheduleCard key={schedule.id} schedule={schedule} />)}
+            {visibleClasses.map((schedule) => <ScheduleCard key={schedule.id} schedule={schedule} onEdit={editClass} onDelete={deleteClass} />)}
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
@@ -150,7 +164,7 @@ function Summary({ label, value, detail, tone = "slate" }: { label: string; valu
   );
 }
 
-function ScheduleCard({ schedule }: { schedule: Schedule }) {
+function ScheduleCard({ schedule, onEdit, onDelete }: { schedule: Schedule; onEdit: (schedule: Schedule) => Promise<void>; onDelete: (schedule: Schedule) => Promise<void> }) {
   const isLab = schedule.title.toLowerCase().includes("lab");
   return (
     <article className="group flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md sm:flex-row sm:items-center">
@@ -174,7 +188,8 @@ function ScheduleCard({ schedule }: { schedule: Schedule }) {
         </div>
       </div>
       <div className="flex items-center justify-end gap-1">
-        <button aria-label={`Edit ${schedule.course}`} className="rounded p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900"><Pencil className="h-4 w-4" /></button>
+        <button aria-label={`Edit ${schedule.course}`} className="rounded p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900" onClick={() => void onEdit(schedule)} type="button"><Pencil className="h-4 w-4" /></button>
+        <button aria-label={`Delete ${schedule.course}`} className="rounded p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-700" onClick={() => void onDelete(schedule)} type="button"><Trash2 className="h-4 w-4" /></button>
         <button aria-label={`View ${schedule.course}`} className="rounded p-2 text-slate-400 transition hover:bg-teal-50 hover:text-teal-700"><ChevronRight className="h-4 w-4" /></button>
       </div>
     </article>
