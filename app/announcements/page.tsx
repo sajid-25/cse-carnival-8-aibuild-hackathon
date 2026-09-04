@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import announcements from "@/data/announcements.json";
+import { useApiList } from "@/lib/use-api-list";
 import {
   AlertCircle,
   CalendarDays,
@@ -27,7 +28,7 @@ function formatDate(date: string) {
 }
 
 export default function AnnouncementsPage() {
-  const [announcementList, setAnnouncementList] = useState<Announcement[]>(announcements);
+  const { data: announcementList, setData: setAnnouncementList, isLoading, error } = useApiList<Announcement>("/api/announcements");
   const [query, setQuery] = useState("");
   const [priority, setPriority] = useState<PriorityFilter>("all");
   const [showExpired, setShowExpired] = useState(false);
@@ -57,10 +58,13 @@ export default function AnnouncementsPage() {
     (announcement) => announcement.expires >= today && announcement.expires <= "2026-09-10",
   ).length;
 
-  function postAnnouncement(event: FormEvent<HTMLFormElement>) {
+  async function postAnnouncement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!newAnnouncement.title || !newAnnouncement.body || !newAnnouncement.posted_by || !newAnnouncement.expires) return;
-    setAnnouncementList((current) => [{ id: `ann-${Date.now()}`, ...newAnnouncement, date: today } as Announcement, ...current]);
+    const response = await fetch("/api/announcements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...newAnnouncement, date: today }) });
+    if (!response.ok) return;
+    const createdAnnouncement = await response.json();
+    setAnnouncementList((current) => [createdAnnouncement, ...current]);
     setNewAnnouncement({ title: "", body: "", priority: "medium", posted_by: "", expires: "" });
     setIsPostOpen(false);
   }
@@ -133,7 +137,7 @@ export default function AnnouncementsPage() {
           <span className="hidden text-xs text-slate-400 sm:inline">Updated from campus data</span>
         </div>
 
-        {visibleAnnouncements.length > 0 ? (
+        {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading announcements...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : visibleAnnouncements.length > 0 ? (
           <div className="space-y-4">
             {visibleAnnouncements.map((announcement) => (
               <AnnouncementCard announcement={announcement} key={announcement.id} />
@@ -182,7 +186,7 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
     medium: { border: "border-l-amber-500", badge: "bg-amber-50 text-amber-700", label: "Medium priority" },
     low: { border: "border-l-slate-400", badge: "bg-slate-100 text-slate-600", label: "Low priority" },
   };
-  const styles = priorityStyles[announcement.priority];
+  const styles = priorityStyles[announcement.priority as keyof typeof priorityStyles];
 
   return (
     <article className={`rounded-lg border border-slate-200 border-l-4 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:shadow-md ${styles.border} ${isExpired ? "opacity-70" : ""}`}>

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { CalendarDays, ChevronRight, Clock3, DoorOpen, Megaphone, Sparkles, TrendingUp } from "lucide-react";
-import announcements from "@/data/announcements.json";
-import assignments from "@/data/assignments.json";
-import events from "@/data/events.json";
-import rooms from "@/data/rooms.json";
-import schedules from "@/data/schedules.json";
+import db from "@/lib/db";
+import fallbackAnnouncements from "@/data/announcements.json";
+import fallbackAssignments from "@/data/assignments.json";
+import fallbackEvents from "@/data/events.json";
+import fallbackRooms from "@/data/rooms.json";
+import fallbackSchedules from "@/data/schedules.json";
 
 const today = "2026-09-04";
 
@@ -12,7 +13,30 @@ function formatDate(date: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${date}T00:00:00`));
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  let announcements;
+  let assignments;
+  let events;
+  let rooms;
+  let schedules;
+
+  try {
+    [announcements, assignments, events, rooms, schedules] = await Promise.all([
+      db.announcement.findMany(),
+      db.assignment.findMany(),
+      db.event.findMany(),
+      db.room.findMany(),
+      db.schedule.findMany(),
+    ]);
+  } catch {
+    [announcements, assignments, events, rooms, schedules] = [
+      fallbackAnnouncements,
+      fallbackAssignments,
+      fallbackEvents,
+      fallbackRooms,
+      fallbackSchedules,
+    ];
+  }
   const urgentAnnouncements = announcements.filter((announcement) => announcement.priority === "high" && announcement.expires >= today).slice(0, 3);
   const upcomingAssignments = assignments.filter((assignment) => assignment.status === "pending").sort((first, second) => first.deadline.localeCompare(second.deadline)).slice(0, 3);
   const upcomingEvents = events.filter((event) => event.status === "upcoming").sort((first, second) => first.date.localeCompare(second.date)).slice(0, 3);

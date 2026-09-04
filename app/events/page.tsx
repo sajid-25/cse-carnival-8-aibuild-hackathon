@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import events from "@/data/events.json";
 import {
   CalendarDays,
@@ -26,11 +26,29 @@ function formatDate(date: string) {
 }
 
 export default function EventsPage() {
-  const [eventList, setEventList] = useState<Event[]>(events);
+  const [eventList, setEventList] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<EventFilter>("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({ name: "", date: "", start_time: "", end_time: "", venue: "", capacity: "" });
+
+  async function loadEvents() {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/events", { cache: "no-store" });
+      if (!response.ok) throw new Error("Unable to load events.");
+      setEventList(await response.json());
+      setError("");
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Unable to load events.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadEvents(); }, []);
 
   const filteredEvents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -52,30 +70,23 @@ export default function EventsPage() {
   const registeredTotal = eventList.reduce((total, event) => total + event.registered, 0);
   const upcomingCount = eventList.filter((event) => event.status === "upcoming").length;
 
-  function addEvent(event: React.FormEvent<HTMLFormElement>) {
+  async function addEvent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!newEvent.name || !newEvent.date || !newEvent.start_time || !newEvent.end_time || !newEvent.venue || !newEvent.capacity) return;
 
-    setEventList((current) => [
-      ...current,
-      {
-        id: `evt-${Date.now()}`,
-        name: newEvent.name,
-        description: "New campus event",
-        date: newEvent.date,
-        start_time: newEvent.start_time,
-        end_time: newEvent.end_time,
-        end_date: newEvent.date,
-        venue: newEvent.venue,
-        organizer: "CampusOS user",
-        capacity: Number(newEvent.capacity),
-        registered: 0,
-        registrations: [],
-        status: "upcoming",
-      } as Event,
-    ]);
+    const response = await fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...newEvent, description: "New campus event", end_date: newEvent.date, organizer: "CampusOS user", registered: 0, status: "upcoming", capacity: Number(newEvent.capacity) }) });
+    if (!response.ok) {
+      setError("Unable to create event.");
+      return;
+    }
+    await loadEvents();
     setNewEvent({ name: "", date: "", start_time: "", end_time: "", venue: "", capacity: "" });
     setIsAddOpen(false);
+  }
+
+  async function registerEvent(event: Event) {
+    const response = await fetch(`/api/events/${event.id}/registrations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: "20-40532", name: "Sakibul Hassan" }) });
+    if (response.ok) await loadEvents();
   }
 
   return (
@@ -100,7 +111,7 @@ export default function EventsPage() {
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">
-            <Summary label="Total events" value={events.length} />
+            <Summary label="Total events" value={eventList.length} />
             <Summary label="Coming up" value={upcomingCount} tone="teal" />
             <Summary label="Open places" value={openSpots} tone="amber" />
             <Summary label="Registrations" value={registeredTotal} />
@@ -140,10 +151,10 @@ export default function EventsPage() {
           <span className="hidden text-xs text-slate-400 sm:inline">Updated from campus data</span>
         </div>
 
-        {filteredEvents.length > 0 ? (
+        {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading events...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : filteredEvents.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredEvents.map((event) => (
-              <EventCard event={event} key={event.id} />
+              <EventCard event={event} key={event.id} onRegister={registerEvent} />
             ))}
           </div>
         ) : (
@@ -185,7 +196,7 @@ function Summary({ label, value, tone = "slate" }: { label: string; value: numbe
   );
 }
 
-function EventCard({ event }: { event: Event }) {
+function EventCard({ event, onRegister }: { event: Event; onRegister: (event: Event) => Promise<void> }) {
   const spotsLeft = Math.max(event.capacity - event.registered, 0);
   const isFull = event.status === "full" || spotsLeft === 0;
   const registrationPercentage = Math.min((event.registered / event.capacity) * 100, 100);
@@ -220,7 +231,7 @@ function EventCard({ event }: { event: Event }) {
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-teal-600" style={{ width: `${registrationPercentage}%` }} /></div>
         <div className="mt-5 flex items-center justify-between gap-3">
           <span className="text-xs font-medium text-slate-500">{isFull ? "Registration closed" : `${spotsLeft} places left`}</span>
-          <button className={`inline-flex items-center gap-1 text-xs font-bold ${isFull ? "text-slate-400" : "text-teal-700 hover:text-teal-900"}`} disabled={isFull || event.status === "cancelled"}>
+          <button className={`inline-flex items-center gap-1 text-xs font-bold ${isFull ? "text-slate-400" : "text-teal-700 hover:text-teal-900"}`} disabled={isFull || event.status === "cancelled"} onClick={() => void onRegister(event)} type="button">
             {isFull ? "View details" : <><Check className="h-3.5 w-3.5" /> Register</>}
             <ChevronRight className="h-3.5 w-3.5" />
           </button>

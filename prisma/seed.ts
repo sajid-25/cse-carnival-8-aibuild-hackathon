@@ -1,4 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
+import { Prisma, PrismaClient } from "@prisma/client";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -79,7 +80,7 @@ async function main() {
 
   // 1. Schedules
   const schedules = readJson<object[]>("schedules.json");
-  await db.schedule.createMany({ data: schedules as Parameters<typeof db.schedule.createMany>[0]["data"] });
+  await db.schedule.createMany({ data: schedules as Prisma.ScheduleCreateManyInput[] });
   console.log(`✅ Schedules: ${schedules.length} rows`);
 
   // 2. Rooms + Bookings
@@ -127,12 +128,12 @@ async function main() {
 
   // 4. Announcements
   const announcements = readJson<object[]>("announcements.json");
-  await db.announcement.createMany({ data: announcements as Parameters<typeof db.announcement.createMany>[0]["data"] });
+  await db.announcement.createMany({ data: announcements as Prisma.AnnouncementCreateManyInput[] });
   console.log(`✅ Announcements: ${announcements.length} rows`);
 
   // 5. Assignments
   const assignments = readJson<object[]>("assignments.json");
-  await db.assignment.createMany({ data: assignments as Parameters<typeof db.assignment.createMany>[0]["data"] });
+  await db.assignment.createMany({ data: assignments as Prisma.AssignmentCreateManyInput[] });
   console.log(`✅ Assignments: ${assignments.length} rows`);
 
   console.log("🎉 Seeding complete!");

@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import schedules from "@/data/schedules.json";
+import { useApiList } from "@/lib/use-api-list";
 import {
   CalendarDays,
   ChevronRight,
@@ -22,7 +23,7 @@ function dayAbbreviation(day: string) {
 }
 
 export default function SchedulePage() {
-  const [scheduleList, setScheduleList] = useState<Schedule[]>(schedules);
+  const { data: scheduleList, setData: setScheduleList, isLoading, error } = useApiList<Schedule>("/api/schedules");
   const [selectedDay, setSelectedDay] = useState<(typeof days)[number]>("Sunday");
   const [query, setQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -43,15 +44,18 @@ export default function SchedulePage() {
       .sort((first, second) => first.start_time.localeCompare(second.start_time));
   }, [query, scheduleList, selectedDay]);
 
-  const busiestDay = days.reduce((busiest, day) => {
+  const busiestDay = days.reduce<{ day: (typeof days)[number]; count: number }>((busiest, day) => {
     const count = scheduleList.filter((schedule) => schedule.day === day).length;
     return count > busiest.count ? { day, count } : busiest;
   }, { day: days[0], count: 0 });
 
-  function addClass(event: FormEvent<HTMLFormElement>) {
+  async function addClass(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!newClass.course || !newClass.title || !newClass.start_time || !newClass.end_time || !newClass.room || !newClass.instructor || !newClass.section) return;
-    setScheduleList((current) => [...current, { id: `sch-${Date.now()}`, ...newClass } as Schedule]);
+    const response = await fetch("/api/schedules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newClass) });
+    if (!response.ok) return;
+    const createdSchedule = await response.json();
+    setScheduleList((current) => [...current, createdSchedule]);
     setSelectedDay(newClass.day);
     setNewClass({ course: "", title: "", day: "Sunday", start_time: "", end_time: "", room: "", instructor: "", section: "" });
     setIsAddOpen(false);
@@ -117,7 +121,7 @@ export default function SchedulePage() {
           <span className="hidden text-xs text-slate-400 sm:inline">Sunday to Thursday</span>
         </div>
 
-        {visibleClasses.length > 0 ? (
+        {isLoading ? <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-500">Loading schedule...</div> : error ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-sm text-red-700">{error}</div> : visibleClasses.length > 0 ? (
           <div className="space-y-3">
             {visibleClasses.map((schedule) => <ScheduleCard key={schedule.id} schedule={schedule} />)}
           </div>
