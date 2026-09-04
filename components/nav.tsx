@@ -6,10 +6,9 @@ import {
   LayoutDashboard, 
   CalendarDays, 
   DoorOpen, 
-  CalendarCheck, 
+  Sparkles, 
   Megaphone, 
   BookOpenCheck, 
-  Bot,
   GraduationCap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,10 +17,9 @@ const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Schedule", href: "/schedule", icon: CalendarDays },
   { label: "Rooms", href: "/rooms", icon: DoorOpen },
-  { label: "Events", href: "/events", icon: CalendarCheck },
+  { label: "Events", href: "/events", icon: Sparkles },
   { label: "Announcements", href: "/announcements", icon: Megaphone },
   { label: "Assignments", href: "/assignments", icon: BookOpenCheck },
-  { label: "Chat", href: "/chat", icon: Bot },
 ];
 
 export function TopNav() {
