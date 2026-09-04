@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Schedule {
+  id         String @id
+  course     String
+  title      String
+  day        String
+  start_time String
+  end_time   String
+  room       String
+  instructor String
+  section    String
+
+  @@map("schedules")
+}
+
+model Room {
+  id          String    @id
+  room_number String
+  type        String
+  capacity    Int
+  equipment   Json
+  floor       Int
+  status      String
+  bookings    Booking[]
+
+  @@map("rooms")
+}
+
+model Booking {
+  booking_id String @id
+  room_id    String
+  room       Room   @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  booked_by  String
+  date       String
+  start_time String
+  end_time   String
+  purpose    String
+
+  @@map("bookings")
+}
+
+model Event {
+  id            String         @id
+  name          String
+  description   String         @db.Text
+  date          String
+  start_time    String
+  end_time      String
+  end_date      String
+  venue         String
+  organizer     String
+  capacity      Int
+  registered    Int
+  status        String
+  registrations Registration[]
+
+  @@map("events")
+}
+
+model Registration {
+  event_id   String
+  student_id String
+  name       String
+  event      Event  @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@id([event_id, student_id])
+  @@map("registrations")
+}
+
+model Announcement {
+  id        String @id
+  title     String
+  body      String @db.Text
+  date      String
+  priority  String
+  posted_by String
+  expires   String
+
+  @@map("announcements")
+}
+
+model Assignment {
+  id                  String @id
+  course              String
+  course_title        String
+  title               String
+  description         String @db.Text
+  assigned_date       String
+  deadline            String
+  submission_platform String
+  status              String
+  marks               Int
+
+  @@map("assignments")
+}
